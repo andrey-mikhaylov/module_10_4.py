@@ -1,25 +1,11 @@
+import random
+import threading
+import time
 from queue import Queue
 from threading import Thread
 
 
-class Table:
-    """
-    Стол
-    """
-    def __init__(self, number: int):
-        """
-        Стол
-        :param number: номер стола
-        """
-        self.number = number
-        # гость, который сидит за этим столом (по умолчанию None)
-        self.guest = None
-
-
 class Guest(Thread):
-    """
-    Гость
-    """
     def __init__(self, name: str):
         """
         Гость
@@ -32,32 +18,61 @@ class Guest(Thread):
         """
         Происходит ожидание случайным образом от 3 до 10 секунд.
         """
-        pass
+        time.sleep(random.randint(3, 10))
+
+
+class Table:
+    def __init__(self, number: int):
+        """
+        Стол
+        :param number: номер стола
+        """
+        self.number = number
+        # гость, который сидит за этим столом (по умолчанию None)
+        self.guest: Guest | None = None
 
 
 class Cafe:
-    """
-    Кафе
-    """
     def __init__(self, *tables: Table):
         """
         Кафе
-        :param tables: столы в этом кафе (любая коллекция)
+        :param tables1: столы в этом кафе (любая коллекция)
         """
         self.queue = Queue()    # очередь
         self.tables = tables
+
+    def _free_table(self) -> Table | None:
+        for table in self.tables:
+            if table.guest is None:  # Далее, если есть свободный стол,
+                return table
+
+    def _occupied_table(self) -> Table | None:
+        for table in self.tables:
+            if table.guest is not None:
+                return table
+
+    def _place_guest(self, table: Table, guest: Guest):
+        # то садить гостя за стол (назначать столу guest),
+        table.guest = guest
+        # запускать поток гостя
+        th = threading.Thread(target=Guest.run, args=(guest,))
 
     def guest_arrival(self, *guests: Guest):
         """
         :param guests: неограниченное кол-во гостей (объектов класса Guest)
         """
-        # Далее, если есть свободный стол,
-        # то садить гостя за стол (назначать столу guest),
-        # запускать поток гостя
-        # и выводить на экран строку "<имя гостя> сел(-а) за стол номер <номер стола>".
-        # Если же свободных столов для посадки не осталось,
-        # то помещать гостя в очередь queue
-        # и выводить сообщение "<имя гостя> в очереди".
+        for guest in guests:
+            # Далее, если есть свободный стол,
+            table = self._free_table()
+            if table is not None:
+                # то садить гостя за стол (назначать столу guest),
+                self._place_guest(table, guest)
+                print(f"{guest.name} сел(-а) за стол номер {table.number}")
+            else:                               # Если же свободных столов для посадки не осталось,
+                # то помещать гостя в очередь queue
+                self.queue.put(guest)
+                print(f"{guest.name} в очереди")
+
 
     def discuss_guests(self):
         """
@@ -66,16 +81,28 @@ class Cafe:
         # Обслуживание должно происходить
         # пока очередь не пустая (метод empty)
         # или хотя бы один стол занят.
-        # Если за столом есть гость(поток)
-        # и гость(поток) закончил приём пищи(поток завершил работу - метод is_alive),
-        # то вывести строки "<имя гостя за текущим столом> покушал(-а) и ушёл(ушла)"
-        # и "Стол номер <номер стола> свободен".
-        # Так же текущий стол освобождается (table.guest = None).
-        # Если очередь ещё не пуста (метод empty)
-        # и стол один из столов освободился (None),
-        # то текущему столу присваивается гость взятый из очереди (queue.get()).
-        # Далее выводится строка "<имя гостя из очереди> вышел(-ла) из очереди и сел(-а) за стол номер <номер стола>"
-        # Далее запустить поток этого гостя (start)
+        while True:
+            table = self._occupied_table()
+            # Если за столом есть гость(поток)
+            if table is not None:
+                # и гость(поток) закончил приём пищи(поток завершил работу - метод is_alive),
+                if not table.guest.is_alive():
+                    print(f"{table.guest.name} покушал(-а) и ушёл(ушла)")
+                    print(f"Стол номер {table.number} свободен")
+                    # текущий стол освобождается (table.guest = None).
+                    table.guest = None
+            elif not self.queue.empty():
+                # Если очередь ещё не пуста (метод empty)
+                table = self._free_table()
+                # и стол один из столов освободился (None),
+                if table is not None:
+                    # то текущему столу присваивается гость взятый из очереди (queue.get()).
+                    guest = self.queue.get()
+                    print(f"{guest.name} вышел(-ла) из очереди и сел(-а) за стол номер {table.number}")
+                    # Далее запустить поток этого гостя (start)
+                    self._place_guest(table, guest)
+            else:
+                return
 
 
 def test():
