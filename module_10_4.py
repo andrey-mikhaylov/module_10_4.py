@@ -67,16 +67,18 @@ class Cafe:
 
     def guest_arrival(self, *guests: Guest):
         """
+        помещает гостей за столы или в очередь
         :param guests: неограниченное кол-во гостей (объектов класса Guest)
         """
         for guest in guests:
-            # Далее, если есть свободный стол,
             table = self._get_free_table()
             if table is not None:
+                # Далее, если есть свободный стол,
                 # то садить гостя за стол (назначать столу guest),
                 self._place_guest(table, guest)
                 print(f"{guest.name} сел(-а) за стол номер {table.number}")
-            else:                               # Если же свободных столов для посадки не осталось,
+            else:
+                # Если же свободных столов для посадки не осталось,
                 # то помещать гостя в очередь queue
                 self.queue.put(guest)
                 print(f"{guest.name} в очереди")
